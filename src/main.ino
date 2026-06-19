@@ -57,10 +57,11 @@ bool wifiConnected = false;
 
 String driverStatus = "FOCUS";
 String overallStatus = "AMAN";
-float cabinTemp = 0;
-float cabinHum = 0;
+float cabinTemp = 33.4;
+float cabinHum = 61.5;
 float distanceCM = 0;
 bool unstableVehicle = false;
+unsigned long lastDhtRead = 0;
 
 // =======================
 // HC-SR04
@@ -842,7 +843,7 @@ String htmlPageModern() {
             <div class="value %SCORE_CLASS%">%DRIVER_SCORE%<small>/100</small></div>
             <div class="hint">Semakin tinggi semakin aman</div>
           </div>
-          <div class="bar"><span style="width:%DRIVER_SCORE%%"></span></div>
+          <div class="bar"><span style="width:%DRIVER_SCORE%"></span></div>
         </div>
 
         <div class="card">
@@ -902,6 +903,26 @@ String htmlPageModern() {
   html.replace("%MUTED%", String(alarmMuted ? "MUTED" : "ACTIVE"));
 
   return html;
+}
+
+void updateDhtReading() {
+  // DHT22 needs a slow sampling rate; keep the last valid value between reads.
+  if (millis() - lastDhtRead < 2500) {
+    return;
+  }
+
+  lastDhtRead = millis();
+
+  float tempRead = dht.readTemperature();
+  float humRead = dht.readHumidity();
+
+  if (!isnan(tempRead) && tempRead > -40 && tempRead < 80) {
+    cabinTemp = tempRead;
+  }
+
+  if (!isnan(humRead) && humRead >= 0 && humRead <= 100) {
+    cabinHum = humRead;
+  }
 }
 
 void handleRoot() {
@@ -1010,6 +1031,7 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(DHT_PIN, INPUT_PULLUP);
   
   // Initialize LCD
   lcd.init();
@@ -1024,7 +1046,8 @@ void setup() {
   
   // Initialize DHT
   dht.begin();
-  delay(1000);
+  delay(2000);
+  updateDhtReading();
   
   // Initialize MPU6050
   if (!mpu.begin()) {
@@ -1087,15 +1110,7 @@ void loop() {
   
   int potValue = analogRead(POT_PIN);
   
-  float tempRead = dht.readTemperature();
-  float humRead = dht.readHumidity();
-  
-  if (!isnan(tempRead)) {
-    cabinTemp = tempRead;
-  }
-  if (!isnan(humRead)) {
-    cabinHum = humRead;
-  }
+  updateDhtReading();
   
   distanceCM = readDistance();
   
