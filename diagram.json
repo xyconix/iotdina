@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "author": "Driver Guardian System",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": 37.1, "left": -105.8, "attrs": {} },
+    {
+      "type": "wokwi-lcd1602-i2c",
+      "id": "lcd1",
+      "top": -32,
+      "left": 322.4,
+      "attrs": { "address": "0x27", "columns": "16", "rows": "2" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -13.2,
+      "left": -111.4,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led2",
+      "top": -13.2,
+      "left": -73,
+      "attrs": { "color": "green" }
+    },
+    { "type": "wokwi-buzzer", "id": "bz1", "top": 156, "left": 165, "attrs": { "volume": "0.1" } },
+    {
+      "type": "wokwi-led",
+      "id": "led3",
+      "top": -51.6,
+      "left": -188.2,
+      "attrs": { "color": "red" }
+    },
+    { "type": "wokwi-servo", "id": "servo1", "top": 113.2, "left": -268.8, "attrs": {} },
+    { "type": "wokwi-hc-sr04", "id": "ultrasonic1", "top": 11.1, "left": -445.7, "attrs": {} },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -278.1,
+      "left": -15,
+      "attrs": { "temperature": "33.4", "humidity": "61.5" }
+    },
+    { "type": "wokwi-mpu6050", "id": "imu1", "top": 272.62, "left": -343.28, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 265.4,
+      "left": -76.8,
+      "attrs": { "color": "green", "xray": "1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "pot1:SIG", "esp:34", "green", [] ],
+    [ "pot1:VCC", "esp:3V3", "red", [] ],
+    [ "pot1:GND", "esp:GND.1", "black", [] ],
+    [ "lcd1:SDA", "esp:21", "green", [] ],
+    [ "lcd1:SCL", "esp:22", "blue", [] ],
+    [ "lcd1:VCC", "esp:5V", "red", [] ],
+    [ "lcd1:GND", "esp:GND.2", "black", [] ],
+    [ "led1:A", "esp:25", "red", [] ],
+    [ "led1:C", "esp:GND.3", "black", [] ],
+    [ "led2:A", "esp:26", "green", [] ],
+    [ "led2:C", "esp:GND.3", "black", [] ],
+    [ "led3:A", "esp:27", "red", [] ],
+    [ "led3:C", "esp:GND.3", "black", [] ],
+    [ "bz1:1", "esp:19", "orange", [] ],
+    [ "bz1:2", "esp:GND.1", "black", [] ],
+    [ "servo1:PWM", "esp:18", "purple", [] ],
+    [ "servo1:V+", "esp:5V", "red", [] ],
+    [ "servo1:GND", "esp:GND.2", "black", [] ],
+    [ "ultrasonic1:TRIG", "esp:5", "yellow", [] ],
+    [ "ultrasonic1:ECHO", "esp:17", "green", [] ],
+    [ "ultrasonic1:VCC", "esp:5V", "red", [] ],
+    [ "ultrasonic1:GND", "esp:GND.1", "black", [] ],
+    [ "dht1:DATA", "esp:4", "green", [] ],
+    [ "dht1:VCC", "esp:3V3", "red", [] ],
+    [ "dht1:GND", "esp:GND.1", "black", [] ],
+    [ "imu1:SDA", "esp:21", "green", [] ],
+    [ "imu1:SCL", "esp:22", "blue", [] ],
+    [ "imu1:VCC", "esp:3V3", "red", [] ],
+    [ "imu1:GND", "esp:GND.2", "black", [] ],
+    [ "btn1:1.l", "esp:16", "green", [] ],
+    [ "btn1:2.r", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}
