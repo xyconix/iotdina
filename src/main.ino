@@ -818,31 +818,20 @@ String htmlPageModern() {
         </div>
       </header>
 
-      <section class="status-hero )rawliteral";
-
-  html += overallClass;
-  html += R"rawliteral(">
+      <section class="status-hero %OVERALL_CLASS%">
         <div class="status-label">Overall Status</div>
         <div class="status-value">
           <span class="status-dot"></span>
-          <span class="status-text">)rawliteral";
-  html += overallStatus;
-  html += R"rawliteral(</span>
+          <span class="status-text">%OVERALL_STATUS%</span>
         </div>
-        <div class="status-subtitle">)rawliteral";
-  html += overallHint;
-  html += R"rawliteral(</div>
+        <div class="status-subtitle">%OVERALL_HINT%</div>
       </section>
 
       <div class="grid">
         <div class="card">
           <h3>Driver Mode</h3>
           <div class="metric">
-            <div class="value )rawliteral";
-  html += driverClass;
-  html += R"rawliteral(">)rawliteral";
-  html += driverStatus;
-  html += R"rawliteral(</div>
+            <div class="value %DRIVER_CLASS%">%DRIVER_STATUS%</div>
             <div class="hint">State pengemudi saat ini</div>
           </div>
         </div>
@@ -850,26 +839,16 @@ String htmlPageModern() {
         <div class="card">
           <h3>Score</h3>
           <div class="metric">
-            <div class="value )rawliteral";
-  html += scoreClass;
-  html += R"rawliteral(">)rawliteral";
-  html += String(driverScore);
-  html += R"rawliteral(<small>/100</small></div>
+            <div class="value %SCORE_CLASS%">%DRIVER_SCORE%<small>/100</small></div>
             <div class="hint">Semakin tinggi semakin aman</div>
           </div>
-          <div class="bar"><span style="width:)rawliteral";
-  html += String(driverScore);
-  html += R"rawliteral(%"></span></div>
+          <div class="bar"><span style="width:%DRIVER_SCORE%%"></span></div>
         </div>
 
         <div class="card">
           <h3>Cabin Temperature</h3>
           <div class="metric">
-            <div class="value )rawliteral";
-  html += tempClass;
-  html += R"rawliteral(">)rawliteral";
-  html += String(cabinTemp, 1);
-  html += R"rawliteral(<small> C</small></div>
+            <div class="value %TEMP_CLASS%">%CABIN_TEMP%<small>C</small></div>
             <div class="hint">Suhu kabin terdeteksi</div>
           </div>
         </div>
@@ -877,11 +856,7 @@ String htmlPageModern() {
         <div class="card">
           <h3>Distance</h3>
           <div class="metric">
-            <div class="value )rawliteral";
-  html += distanceClass;
-  html += R"rawliteral(">)rawliteral";
-  html += String(distanceCM, 0);
-  html += R"rawliteral(<small> cm</small></div>
+            <div class="value %DIST_CLASS%">%DIST_CM%<small>cm</small></div>
             <div class="hint">Jarak objek di depan sensor</div>
           </div>
         </div>
@@ -889,18 +864,10 @@ String htmlPageModern() {
         <div class="card wide">
           <h3>Live Snapshot</h3>
           <div class="chips">
-            <div class="chip">Humidity: <strong>)rawliteral";
-  html += String(cabinHum, 0);
-  html += R"rawliteral(</strong>%</div>
-            <div class="chip">Unstable: <strong>)rawliteral";
-  html += String(unstableVehicle ? "YES" : "NO");
-  html += R"rawliteral(</strong></div>
-            <div class="chip">WiFi: <strong>)rawliteral";
-  html += String(wifiConnected ? "ON" : "OFF");
-  html += R"rawliteral(</strong></div>
-            <div class="chip">Buzzer: <strong>)rawliteral";
-  html += String(alarmMuted ? "MUTED" : "ACTIVE");
-  html += R"rawliteral(</strong></div>
+            <div class="chip">Humidity: <strong>%CABIN_HUM%</strong>%</div>
+            <div class="chip">Unstable: <strong>%UNSTABLE%</strong></div>
+            <div class="chip">WiFi: <strong>%WIFI%</strong></div>
+            <div class="chip">Buzzer: <strong>%MUTED%</strong></div>
           </div>
         </div>
       </div>
@@ -917,6 +884,22 @@ String htmlPageModern() {
 </body>
 </html>
 )rawliteral";
+
+  html.replace("%OVERALL_CLASS%", overallClass);
+  html.replace("%OVERALL_STATUS%", overallStatus);
+  html.replace("%OVERALL_HINT%", overallHint);
+  html.replace("%DRIVER_CLASS%", driverClass);
+  html.replace("%DRIVER_STATUS%", driverStatus);
+  html.replace("%SCORE_CLASS%", scoreClass);
+  html.replace("%DRIVER_SCORE%", String(driverScore));
+  html.replace("%TEMP_CLASS%", tempClass);
+  html.replace("%CABIN_TEMP%", String(cabinTemp, 1));
+  html.replace("%DIST_CLASS%", distanceClass);
+  html.replace("%DIST_CM%", String(distanceCM, 0));
+  html.replace("%CABIN_HUM%", String(cabinHum, 0));
+  html.replace("%UNSTABLE%", String(unstableVehicle ? "YES" : "NO"));
+  html.replace("%WIFI%", String(wifiConnected ? "ON" : "OFF"));
+  html.replace("%MUTED%", String(alarmMuted ? "MUTED" : "ACTIVE"));
 
   return html;
 }
