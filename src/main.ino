@@ -6,6 +6,8 @@
 #include <ESP32Servo.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 // =======================
 // PIN CONFIG
@@ -32,6 +34,10 @@ const char* sta_ssid = "Wokwi-GUEST";
 const char* sta_password = "";
 const char* ap_ssid = "ESP32-Driver";
 const char* ap_password = "12345678";
+
+// Fill these with your Telegram bot token and chat id.
+const char* telegramBotToken = getenv("TELEGRAM_BOT_TOKEN");
+const char* telegramChatId = getenv("TELEGRAM_CHAT_ID");
 
 // =======================
 // OBJECTS
@@ -62,6 +68,26 @@ float cabinHum = 61.5;
 float distanceCM = 0;
 bool unstableVehicle = false;
 unsigned long lastDhtRead = 0;
+String statusReason = "System starting";
+String lastNotifiedOverallStatus = "";
+String lastNotifiedDriverStatus = "";
+
+struct LogEntry {
+  unsigned long ms;
+  String level;
+  String message;
+  String driver;
+  String overall;
+  float temp;
+  float hum;
+  float distance;
+  bool unstable;
+};
+
+const int LOG_CAPACITY = 12;
+LogEntry logEntries[LOG_CAPACITY];
+int logHead = 0;
+int logCount = 0;
 
 // =======================
 // HC-SR04
@@ -96,6 +122,163 @@ void beepDanger() {
 
 void stopBuzzer() {
   noTone(BUZZER_PIN);
+}
+
+// =======================
+// TIME / LOG HELPERS
+// =======================
+
+String formatUptime(unsigned long ms) {
+  unsigned long totalSeconds = ms / 1000;
+  unsigned long minutes = totalSeconds / 60;
+  unsigned long seconds = totalSeconds % 60;
+  unsigned long hours = minutes / 60;
+  minutes %= 60;
+
+  char buffer[24];
+  snprintf(buffer, sizeof(buffer), "%02lu:%02lu:%02lu", hours, minutes, seconds);
+  return String(buffer);
+}
+
+String urlEncode(const String& input) {
+  String encoded;
+  encoded.reserve(input.length() * 3);
+
+  for (size_t i = 0; i < input.length(); i++) {
+    char c = input[i];
+    if ((c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9') ||
+        c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += c;
+    } else if (c == ' ') {
+      encoded += "%20";
+    } else if (c == '\n') {
+      encoded += "%0A";
+    } else if (c == '\r') {
+      // skip
+    } else {
+      char hex[4];
+      snprintf(hex, sizeof(hex), "%%%02X", (unsigned char)c);
+      encoded += hex;
+    }
+  }
+
+  return encoded;
+}
+
+void addLog(const String& level, const String& message) {
+  LogEntry& entry = logEntries[logHead];
+  entry.ms = millis();
+  entry.level = level;
+  entry.message = message;
+  entry.driver = driverStatus;
+  entry.overall = overallStatus;
+  entry.temp = cabinTemp;
+  entry.hum = cabinHum;
+  entry.distance = distanceCM;
+  entry.unstable = unstableVehicle;
+
+  logHead = (logHead + 1) % LOG_CAPACITY;
+  if (logCount < LOG_CAPACITY) {
+    logCount++;
+  }
+}
+
+String severityColor(const String& level) {
+  if (level == "BAHAYA" || level == "ERROR") return "status-danger";
+  if (level == "WASPADA" || level == "WARN") return "status-warn";
+  return "status-ok";
+}
+
+String buildStatusReason() {
+  String reason;
+
+  if (driverStatus == "SLEEPING") {
+    reason += "driver sleep; ";
+  } else if (driverStatus == "DROWSY") {
+    reason += "driver drowsy; ";
+  } else {
+    reason += "driver focus; ";
+  }
+
+  if (distanceCM < 50) {
+    reason += "distance critical; ";
+  } else if (distanceCM < 80) {
+    reason += "distance close; ";
+  }
+
+  if (cabinTemp > 35) {
+    reason += "cabin hot; ";
+  }
+
+  if (unstableVehicle) {
+    reason += "vehicle unstable; ";
+  }
+
+  if (reason.length() == 0) {
+    reason = "all sensors normal";
+  }
+
+  return reason;
+}
+
+void sendTelegramMessage(const String& message) {
+  if (String(telegramBotToken) == "ISI_TOKEN_BOT" ||
+      String(telegramChatId) == "ISI_CHAT_ID") {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient https;
+  String url = String("https://api.telegram.org/bot") + telegramBotToken + "/sendMessage";
+
+  if (!https.begin(client, url)) {
+    Serial.println("Telegram: begin failed");
+    return;
+  }
+
+  https.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  String body = "chat_id=" + String(telegramChatId) + "&text=" + urlEncode(message);
+  int code = https.POST(body);
+
+  Serial.print("Telegram status: ");
+  Serial.println(code);
+  https.end();
+}
+
+void notifyStatusIfNeeded(bool force = false) {
+  bool overallChanged = overallStatus != lastNotifiedOverallStatus;
+  bool driverChanged = driverStatus != lastNotifiedDriverStatus;
+
+  if (!force && !overallChanged && !driverChanged) {
+    return;
+  }
+
+  String message;
+  message += "[";
+  message += overallStatus;
+  message += "] Driver Guardian\n";
+  message += "Driver: " + driverStatus + "\n";
+  message += "Score: " + String(driverScore) + "/100\n";
+  message += "Temp: " + String(cabinTemp, 1) + " C\n";
+  message += "Humidity: " + String(cabinHum, 0) + " %\n";
+  message += "Distance: " + String(distanceCM, 0) + " cm\n";
+  message += "Unstable: " + String(unstableVehicle ? "YES" : "NO") + "\n";
+  message += "Reason: " + statusReason + "\n";
+  message += "Uptime: " + formatUptime(millis());
+
+  sendTelegramMessage(message);
+  addLog(overallStatus, "Telegram sent: " + statusReason);
+
+  lastNotifiedOverallStatus = overallStatus;
+  lastNotifiedDriverStatus = driverStatus;
 }
 
 // =======================
@@ -782,6 +965,42 @@ String htmlPageModern() {
       text-transform: uppercase;
     }
     .chip strong { color: var(--cyan); }
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .log-table th,
+    .log-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      text-align: left;
+      vertical-align: top;
+    }
+    .log-table th {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 11px;
+    }
+    .log-table td {
+      color: var(--text);
+    }
+    .log-level {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .log-msg {
+      color: var(--muted);
+    }
     .footer {
       position: relative;
       z-index: 1;
@@ -862,16 +1081,35 @@ String htmlPageModern() {
           </div>
         </div>
 
-        <div class="card wide">
-          <h3>Live Snapshot</h3>
-          <div class="chips">
-            <div class="chip">Humidity: <strong>%CABIN_HUM%</strong>%</div>
-            <div class="chip">Unstable: <strong>%UNSTABLE%</strong></div>
-            <div class="chip">WiFi: <strong>%WIFI%</strong></div>
-            <div class="chip">Buzzer: <strong>%MUTED%</strong></div>
-          </div>
+      <div class="card wide">
+        <h3>Live Snapshot</h3>
+        <div class="chips">
+          <div class="chip">Humidity: <strong>%CABIN_HUM%</strong>%</div>
+          <div class="chip">Unstable: <strong>%UNSTABLE%</strong></div>
+          <div class="chip">WiFi: <strong>%WIFI%</strong></div>
+          <div class="chip">Buzzer: <strong>%MUTED%</strong></div>
+          <div class="chip">Reason: <strong>%REASON%</strong></div>
+          <div class="chip"><a href="/logs" style="color:inherit; text-decoration:none;">Open logs</a></div>
         </div>
       </div>
+
+      <div class="card wide">
+        <h3>Recent Logs</h3>
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Level</th>
+              <th>Message</th>
+              <th>Snapshot</th>
+            </tr>
+          </thead>
+          <tbody>
+            %LOG_ROWS%
+          </tbody>
+        </table>
+      </div>
+    </div>
 
       <div class="footer">
         System v2.0 | ESP32 Driver Guardian | Last update: <span id="timestamp"></span>
@@ -901,6 +1139,32 @@ String htmlPageModern() {
   html.replace("%UNSTABLE%", String(unstableVehicle ? "YES" : "NO"));
   html.replace("%WIFI%", String(wifiConnected ? "ON" : "OFF"));
   html.replace("%MUTED%", String(alarmMuted ? "MUTED" : "ACTIVE"));
+  html.replace("%REASON%", statusReason);
+
+  String logRows;
+  for (int i = 0; i < logCount; i++) {
+    int index = logHead - logCount + i;
+    while (index < 0) {
+      index += LOG_CAPACITY;
+    }
+    index %= LOG_CAPACITY;
+
+    const LogEntry& entry = logEntries[index];
+    logRows += "<tr>";
+    logRows += "<td>" + formatUptime(entry.ms) + "</td>";
+    logRows += "<td><span class=\"log-level " + severityColor(entry.level) + "\">" + entry.level + "</span></td>";
+    logRows += "<td class=\"log-msg\">" + entry.message + "</td>";
+    logRows += "<td class=\"log-msg\">";
+    logRows += "D:" + entry.driver + " | O:" + entry.overall + " | T:" + String(entry.temp, 1) + "C";
+    logRows += " | H:" + String(entry.hum, 0) + "% | Dist:" + String(entry.distance, 0) + "cm";
+    logRows += " | U:" + String(entry.unstable ? "YES" : "NO");
+    logRows += "</td>";
+    logRows += "</tr>";
+  }
+  if (logRows.length() == 0) {
+    logRows = "<tr><td colspan=\"4\" class=\"log-msg\">Belum ada log.</td></tr>";
+  }
+  html.replace("%LOG_ROWS%", logRows);
 
   return html;
 }
@@ -929,6 +1193,10 @@ void handleRoot() {
   server.send(200, "text/html", htmlPageModern());
 }
 
+void handleLogs() {
+  server.send(200, "text/html", htmlPageModern());
+}
+
 void handleNotFound() {
   String message = "404: Not Found\n\n";
   message += "URI: ";
@@ -942,12 +1210,42 @@ void handleStatus() {
   String json = "{";
   json += "\"driver\":\"" + driverStatus + "\",";
   json += "\"status\":\"" + overallStatus + "\",";
+  json += "\"reason\":\"" + statusReason + "\",";
   json += "\"score\":" + String(driverScore) + ",";
   json += "\"temp\":" + String(cabinTemp, 1) + ",";
   json += "\"hum\":" + String(cabinHum, 0) + ",";
   json += "\"distance\":" + String(distanceCM, 0) + ",";
   json += "\"unstable\":" + String(unstableVehicle ? "true" : "false");
   json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleLogsJson() {
+  String json = "[";
+  for (int i = 0; i < logCount; i++) {
+    int index = logHead - logCount + i;
+    while (index < 0) {
+      index += LOG_CAPACITY;
+    }
+    index %= LOG_CAPACITY;
+
+    const LogEntry& entry = logEntries[index];
+    if (i > 0) {
+      json += ",";
+    }
+    json += "{";
+    json += "\"time\":\"" + formatUptime(entry.ms) + "\",";
+    json += "\"level\":\"" + entry.level + "\",";
+    json += "\"message\":\"" + entry.message + "\",";
+    json += "\"driver\":\"" + entry.driver + "\",";
+    json += "\"overall\":\"" + entry.overall + "\",";
+    json += "\"temp\":" + String(entry.temp, 1) + ",";
+    json += "\"hum\":" + String(entry.hum, 0) + ",";
+    json += "\"distance\":" + String(entry.distance, 0) + ",";
+    json += "\"unstable\":" + String(entry.unstable ? "true" : "false");
+    json += "}";
+  }
+  json += "]";
   server.send(200, "application/json", json);
 }
 
@@ -1065,12 +1363,14 @@ void setup() {
   
   // Setup Web Server
   server.on("/", handleRoot);
+  server.on("/logs", handleLogs);
   server.on("/status", handleStatus);
+  server.on("/api/logs", handleLogsJson);
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("✅ HTTP Server started");
   
-  if (WiFi.getMode() == WIFI_AP) {
+  if (WiFi.status() != WL_CONNECTED) {
     Serial.println("=================================");
     Serial.println("🌐 Connect to WiFi: " + String(ap_ssid));
     Serial.println("🔑 Password: " + String(ap_password));
@@ -1084,6 +1384,7 @@ void setup() {
   
   // Show initial page
   showPage();
+  addLog("INFO", "System boot complete");
 }
 
 // =======================
@@ -1109,6 +1410,8 @@ void loop() {
   // ==================
   
   int potValue = analogRead(POT_PIN);
+  String previousDriverStatus = driverStatus;
+  String previousOverallStatus = overallStatus;
   
   updateDhtReading();
   
@@ -1157,7 +1460,7 @@ void loop() {
   
   if (driverStatus == "DROWSY" ||
       distanceCM < 80 ||
-      cabinTemp > 30) {
+      cabinTemp > 35) {
     overallStatus = "WASPADA";
   }
   
@@ -1168,6 +1471,13 @@ void loop() {
   }
   
   if (danger) overallStatus = "BAHAYA";
+
+  statusReason = buildStatusReason();
+
+  if (previousDriverStatus != driverStatus || previousOverallStatus != overallStatus) {
+    addLog(overallStatus, "State change: " + previousOverallStatus + " -> " + overallStatus + ", " + previousDriverStatus + " -> " + driverStatus);
+    notifyStatusIfNeeded(lastNotifiedOverallStatus.length() == 0);
+  }
   
   // ==================
   // LED CONTROL
@@ -1210,6 +1520,7 @@ void loop() {
     if (!sleeping) {
       sleeping = true;
       sleepStartTime = millis();
+      addLog("WASPADA", "Driver entered sleeping state");
     }
     
     if (millis() - sleepStartTime > 10000) {
@@ -1221,6 +1532,12 @@ void loop() {
       digitalWrite(LED_RED, HIGH);
       if (!alarmMuted) beepDanger();
       shakeServo();
+      if (lastNotifiedOverallStatus != "BAHAYA") {
+        addLog("BAHAYA", "Emergency stop triggered");
+        sendTelegramMessage("[BAHAYA] Emergency stop triggered\nDriver: " + driverStatus + "\nReason: driver sleeping too long\nUptime: " + formatUptime(millis()));
+        lastNotifiedOverallStatus = "BAHAYA";
+        lastNotifiedDriverStatus = driverStatus;
+      }
     }
   } else {
     sleeping = false;
@@ -1244,7 +1561,7 @@ void loop() {
   static unsigned long lastSerialPrint = 0;
   if (millis() - lastSerialPrint > 3000) {
     Serial.println("=================================");
-    if (WiFi.getMode() == WIFI_AP) {
+    if (WiFi.status() != WL_CONNECTED) {
       Serial.print("📡 AP IP: ");
       Serial.println(WiFi.softAPIP());
     } else {
@@ -1257,6 +1574,8 @@ void loop() {
     Serial.println(overallStatus);
     Serial.print("🎯 Score: ");
     Serial.println(driverScore);
+    Serial.print("Reason: ");
+    Serial.println(statusReason);
     Serial.print("🌡️ Temp: ");
     Serial.println(cabinTemp);
     Serial.print("💧 Humidity: ");
