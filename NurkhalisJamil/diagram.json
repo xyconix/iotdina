@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -153.3, "left": 23.4, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": 37.1, "left": -153.8, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay1", "top": 67.4, "left": 230.4, "attrs": {} },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": -64.8,
+      "left": 270.6,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled1",
+      "top": 166.34,
+      "left": 269.03,
+      "attrs": { "i2cAddress": "0x3c" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "dht1:VCC", "esp:3V3", "red", [] ],
+    [ "dht1:GND", "esp:GND.1", "black", [] ],
+    [ "dht1:SDA", "esp:4", "green", [] ],
+    [ "pot1:VCC", "esp:3V3", "red", [] ],
+    [ "pot1:GND", "esp:GND.2", "black", [] ],
+    [ "pot1:SIG", "esp:34", "blue", [] ],
+    [ "relay1:VCC", "esp:5V", "red", [] ],
+    [ "relay1:GND", "esp:GND.3", "black", [] ],
+    [ "relay1:IN", "esp:18", "orange", [] ],
+    [ "bz1:1", "esp:19", "purple", [ "v9.6", "h-196.84" ] ],
+    [ "bz1:2", "esp:GND.4", "black", [] ],
+    [ "oled1:VCC", "esp:3V3", "red", [] ],
+    [ "oled1:GND", "esp:GND.5", "black", [] ],
+    [ "oled1:SDA", "esp:21", "green", [] ],
+    [ "oled1:SCL", "esp:22", "yellow", [] ]
+  ],
+  "dependencies": {}
+}
