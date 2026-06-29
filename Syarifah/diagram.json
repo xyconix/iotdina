@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "Muhammad Farid",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": -97.3, "left": -105.8, "attrs": {} },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -201.3,
+      "left": 186.6,
+      "attrs": { "temperature": "20", "humidity": "27" }
+    },
+    {
+      "type": "wokwi-stepper-motor",
+      "id": "stepper1",
+      "top": 138.01,
+      "left": 154.03,
+      "attrs": { "size": "17" }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled1",
+      "top": 243.14,
+      "left": 9.83,
+      "attrs": { "i2cAddress": "0x3c" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "pot1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "pot1:GND", "esp:GND.1", "black", [ "v182.4", "h81.41" ] ],
+    [ "pot1:SIG", "esp:34", "green", [ "v28.8", "h71.41" ] ],
+    [ "dht1:VCC", "esp:3V3", "red", [ "v57.6", "h-220.8", "v57.6" ] ],
+    [ "dht1:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "dht1:SDA", "esp:4", "yellow", [ "v38.4", "h-76.7", "v192" ] ],
+    [ "oled1:VCC", "esp:3V3", "red", [ "v-19.2", "h-86.25", "v-201.6" ] ],
+    [ "oled1:GND", "esp:GND.1", "black", [ "v-28.8", "h-57.6", "v-67.2" ] ],
+    [ "oled1:SCL", "esp:22", "purple", [ "v-19.2", "h77.1", "v-182.4" ] ],
+    [ "oled1:SDA", "esp:21", "green", [ "v-28.8", "h48.07", "v-144" ] ],
+    [ "stepper1:A+", "esp:14", "orange", [ "v38.4", "h-249.6", "v-220.8" ] ],
+    [ "stepper1:A-", "esp:27", "yellow", [ "v28.8", "h-259.2", "v-220.8" ] ],
+    [ "stepper1:B+", "esp:26", "green", [ "v48", "h-288", "v-249.6" ] ],
+    [ "stepper1:B-", "esp:25", "blue", [ "v57.6", "h-307.21", "v-268.8" ] ]
+  ],
+  "dependencies": {}
+}
